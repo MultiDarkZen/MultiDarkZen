@@ -1,0 +1,90 @@
+using UnityEngine;
+
+public class PerlinNoiseTextureGenerator : MonoBehaviour
+{
+    public int width = 256;
+    public int height = 256;
+    public float scale = 0.1f;
+    public float turbPower = 5.0f;
+    public float turbSize = 32.0f;
+    public Material material;
+
+    private Texture2D texture;
+
+    private enum TextureType { Clouds, Wood, Grass, Ground }
+    private float[] thresholds = { 0.8f, 0.6f, 0.4f, 0.0f };
+
+    private void Start()
+    {
+        GenerateTexture();
+        ApplyTextureToMaterial();
+    }
+
+    private void GenerateTexture()
+    {
+        texture = new Texture2D(width, height);
+        Color32[] pixels = new Color32[width * height];
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                float perlinValue = Mathf.PerlinNoise(x * scale, y * scale);
+                float turbulenceValue = turbPower * Turbulence(x, y, turbSize) / 256.0f;
+                float noiseValue = perlinValue + turbulenceValue;
+
+                Color32 color = DetermineColor(noiseValue);
+                pixels[y * width + x] = color;
+            }
+        }
+
+        texture.SetPixels32(pixels);
+        texture.Apply();
+    }
+
+    private Color32 DetermineColor(float noiseValue)
+    {
+        TextureType textureType = TextureType.Ground;
+
+        if (noiseValue > thresholds[(int)TextureType.Clouds])
+            textureType = TextureType.Clouds;
+        else if (noiseValue > thresholds[(int)TextureType.Wood])
+            textureType = TextureType.Wood;
+        else if (noiseValue > thresholds[(int)TextureType.Grass])
+            textureType = TextureType.Grass;
+
+        switch (textureType)
+        {
+            case TextureType.Clouds:
+                return Color.white;
+            case TextureType.Wood:
+                return new Color32((byte)(noiseValue * 255), (byte)(noiseValue * 255), (byte)(noiseValue * 255), 255);
+            case TextureType.Grass:
+                return new Color32((byte)(noiseValue * 255), (byte)(noiseValue * 255), 0, 255);
+            default:
+                return Color.black;
+        }
+    }
+
+    private float Turbulence(float x, float y, float size)
+    {
+        float value = 0f;
+        float initialSize = size;
+
+        while (size >= 1f)
+        {
+            value += Mathf.PerlinNoise(x / size, y / size) * size;
+            size /= 2f;
+        }
+
+        return value / initialSize;
+    }
+
+    private void ApplyTextureToMaterial()
+    {
+        if (material != null)
+        {
+            material.SetTexture("_MainTex", texture);
+        }
+    }
+}
